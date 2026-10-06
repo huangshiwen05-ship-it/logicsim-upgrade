@@ -1,118 +1,121 @@
-# logicsim
+# logicsim（改造版）
 
+一个纯前端的**逆波兰逻辑表达式 → 逻辑电路图**生成器，并新增**真值表**、**中文错误提示**与**移动端适配**。
 
-## Getting started
+## 原项目来源
 
-本程序可通过直接 git clone 项目后，点击本目录下的 index.html 打开，
+- 原项目仓库：<https://gitlab.com/kuangdash/logicsim.git>
+- 原作者：kuangdash（GitLab 用户）
+- 原项目采用 GitLab Pages 部署（`public` 目录 + `.gitlab-ci.yml`），本次改造沿用纯静态部署方式。
+- 原项目未附带 LICENSE 文件，因此本次改造未改变版权归属，继续保留原作者信息；如后续需要正式发布，请与原作者确认许可证。
 
-也可以直接访问本项目的 [gitlab pages](https://kuangdash.gitlab.io/logicsim)，
+## 改造内容（第二阶段）
 
-之后在“解析文本”按钮上面的文本框内输入“逆波兰逻辑表达式”。
+在原项目基础上：
 
-“逆波兰逻辑表达式”支持五种逻辑操作符：
-{
-“.”：“a b .”代表“a”和“b”的逻辑与，
-“,”：“a b ,”代表“a”和“b”的逻辑或，
-“<”：“a <”代表“a”的逻辑非，
-“>”：“a b >”代表“a”和“b”的逻辑推出，
+1. **保留原有功能**
+   - 五种逻辑运算：与 `.`、或 `,`、非 `<`、推出 `>`、等价/同或 `=`。
+   - 表达式转图、图与文本（JSON）互转。
+   - 文件导入导出（载入文本 / 保存文本）。
+   - 节点名称与备注编辑。
+2. **新增真值表**
+   - 对表达式中的不同变量枚举全部 0/1 组合（最多 8 个变量，超出给出明确提示）。
+   - 重复变量使用同一取值（独立求值器，不直接复用 ModelGen 的分支路径）。
+   - 显示变量列、结果列，并标注「永真式（重言式）／矛盾式／可满足但非永真」。
+3. **改进错误提示**
+   - 空输入、操作数不足、多余操作数均有中文提示，并尽量标出出错字符位置。
+   - 非法输入不会导致页面崩溃；解析失败时保留上一次成功的图形与真值表，并提示当前显示的是旧结果。
+4. **更新界面**
+   - 简洁中文界面，四个区域清晰区分：① 表达式输入、② 图模型 JSON（文本↔图转换）、③ 节点编辑、④ 真值表。
+   - 增加可点击示例与操作符说明。
+   - 适配桌面与手机：图形与真值表在各自区域滚动，页面不横向溢出。
+   - 沿用原 joint.js 技术栈，纯静态部署，未引入大型框架。
 
-“=”：“a b =”代表“a”和“b”的逻辑等价/同或
-}。
+## 运行方法
 
-逆波兰逻辑表达式组合的举例说明：
-{
-“a b . fe >”即代表逻辑表达“a 与 b   推出了   fe”，
+### 方式一：直接打开（与原项目相同）
 
-“a b . fe ge > =”即代表逻辑表达“a 与 b  等价于  fe 推出了 ge”
-}。
+克隆后直接用浏览器打开 `public/index.html` 即可。
 
-之后点击“解析文本”按钮，将“逆波兰逻辑表达式”转换为适合图形表示的 JSON 格式，
+### 方式二：本地静态服务（推荐）
 
-之后再点击“解析文本”按钮旁的“文本转图”，得到最终的正规图形表示。
+以 `public` 为根目录启动任意静态服务，例如：
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+```bash
+cd public
+python -m http.server 8000
+# 或
+npx http-server -p 8000
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/kuangdash/logicsim.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
+然后访问 <http://127.0.0.1:8000/>。
 
-* [Set up project integrations](https://gitlab.com/kuangdash/logicsim/-/settings/integrations)
+## 使用示例
 
-## Collaborate with your team
+### 输入语法（逆波兰表达式）
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+| 符号 | 含义 | 示例 | 说明 |
+| --- | --- | --- | --- |
+| `.` | 与 AND | `a b .` | a 与 b |
+| `,` | 或 OR | `a b ,` | a 或 b |
+| `<` | 非 NOT | `a <` | 非 a |
+| `>` | 推出 IMPLY | `a b >` | a 推出 b（仅 a=1、b=0 时为假） |
+| `=` | 等价 XNOR | `a b =` | a 等价于 b |
 
-## Test and Deploy
+组合示例：
 
-Use the built-in continuous integration in GitLab.
+- `a b . fe >` 表示「(a 与 b) 推出 fe」。
+- `a b . fe ge > =` 表示「(a 与 b) 等价于 (fe 推出 ge)」。
+- `a a < ,` 为永真式。
+- `a a < .` 为矛盾式。
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+### 操作步骤
 
-***
+1. 在「① 表达式输入」中输入逆波兰表达式，点击「解析文本」。
+2. 图形自动渲染到中部画布，真值表显示在底部，图模型 JSON 自动填入「②」区域。
+3. 可点击示例按钮快速体验；也可用「文本转图 / 图转文本」手动转换。
+4. 点击图形中的节点，在「③ 节点编辑」中修改名称与备注后点「保存修改」。
 
-# Editing this README
+## 测试结果
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+改造后运行了逻辑层测试（Node）与浏览器端测试（Edge headless + CDP），全部通过，无 JS 控制台异常。
 
-## Suggestions for a good README
+### 逻辑层（`test-logic.js`）：30 通过 / 0 失败
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+覆盖：
 
-## Name
-Choose a self-explaining name for your project.
+- 空输入、`a .`（操作数不足）、`a b`（多余操作数）等错误。
+- 五种运算的真值表正确性。
+- `a a < ,`（永真）、`a a < .`（矛盾）、`a b >`（仅 a=1、b=0 为假）。
+- 重复变量取同一值（`a a .` 等价于 `a`）。
+- 9 个变量时真值表报错（上限 8 个）。
+- 五种运算及单变量、常量 `0`/`1` 的图形生成。
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### 浏览器端（`test-browser.js`）：28 通过 / 0 失败
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+覆盖：
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- 页面加载、示例按钮与操作符说明生成。
+- 五种运算在页面中生成图形与真值表。
+- 指定用例（永真/矛盾/推出）的真值表分类。
+- 空输入、操作数不足、多余操作数错误提示，且解析失败后保留旧图形。
+- 图转文本 / 文本转图 / 节点名称备注编辑。
+- 无 JS 控制台异常。
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### 布局（`test-layout.js`）
 
-## Usage
+- 桌面 1280×900：四个区域各就其位，无横向溢出。
+- 手机 390×844：纵向堆叠、小地图隐藏、图形与真值表独立滚动，无横向溢出。
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## 文件说明
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- `public/index.html`：页面结构（四个功能区）。
+- `public/style.css`：桌面 + 手机响应式样式。
+- `public/LogicParser.js`：原解析/建模/图形生成函数，新增独立求值器、校验器与真值表函数（`Npn*`）。
+- `public/ViewGen.js`：图形渲染与交互，新增解析流程、真值表渲染、示例与错误提示。
+- `test-logic.js` / `test-browser.js` / `test-layout.js`：本次改造的测试脚本。
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## 待办
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+- 本阶段未推送远程仓库、未部署。
+- 未引入正式 LICENSE，发布前需与原作者确认。

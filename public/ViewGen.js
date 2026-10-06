@@ -760,19 +760,97 @@ app.ELDump = function (JsonCells) {
 }
 
 
+app.showError = function (msg) {
+    status.textContent = "解析失败：" + msg;
+    status.style.color = "#c62828";
+    var errEl = document.getElementById("errorMsg");
+    if (errEl) {
+        errEl.textContent = "✗ " + msg + "（当前图形与真值表仍显示上一次成功的结果）";
+        errEl.style.display = "block";
+    }
+    var box = document.getElementById("ReversePol");
+    if (box) { box.classList.add("input-error"); }
+};
+
+app.showSuccess = function (msg) {
+    status.textContent = msg;
+    status.style.color = "#1b5e20";
+    var errEl = document.getElementById("errorMsg");
+    if (errEl) { errEl.style.display = "none"; }
+    var box = document.getElementById("ReversePol");
+    if (box) { box.classList.remove("input-error"); }
+};
+
+app.escapeHtml = function (s) {
+    return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+};
+
+app.renderTruthTable = function (tt) {
+    var wrap = document.getElementById("truthTable");
+    var summary = document.getElementById("ttSummary");
+    if (!wrap) { return; }
+    if (tt.error) {
+        if (summary) { summary.textContent = ""; }
+        wrap.innerHTML = '<div class="tt-note">' + app.escapeHtml(tt.error) + "</div>";
+        return;
+    }
+    var html = '<table class="truth-table"><thead><tr>';
+    for (var i = 0; i < tt.variables.length; i++) {
+        html += '<th>' + app.escapeHtml(tt.variables[i]) + "</th>";
+    }
+    html += '<th class="tt-result">结果</th></tr></thead><tbody>';
+    for (var r = 0; r < tt.rows.length; r++) {
+        var row = tt.rows[r];
+        html += "<tr>";
+        for (var j = 0; j < row.values.length; j++) {
+            html += '<td class="tt-val-' + row.values[j] + '">' + row.values[j] + "</td>";
+        }
+        html += '<td class="tt-result tt-val-' + row.result + '">' + row.result + "</td>";
+        html += "</tr>";
+    }
+    html += "</tbody></table>";
+    wrap.innerHTML = html;
+    if (summary) {
+        summary.textContent = "—— " + tt.classification;
+    }
+};
+
 app.parseLogic = function () {
     var exprText = document.getElementById("ReversePol").value;
-    var resultParsed = LogicParser(exprText);
-    if ("string" == typeof (resultParsed)) {
-        status.textContent = resultParsed;
-        status.style.color = "red";
-    } else {
-        var viewModel = ViewGen(ModelGen(resultParsed));
+    var parsed = NpnValidate(exprText);
+
+    if (!parsed.ok) {
+        // 非法输入不崩溃，保留上一次成功图形，并明确提示当前是旧结果
+        app.showError(parsed.error);
+        return;
+    }
+
+    try {
+        var tree = NpnBuildTree(parsed.tokens);
+        var viewModel = ViewGen(ModelGen(tree));
         origin = viewModel;
         document.getElementById("myModel").value = JSON.stringify(origin);
-        status.textContent = "Reverse Polish Expression has been parsed.";
-        status.style.color = "black";
+    } catch (e) {
+        app.showError("生成图形时发生异常：" + e.message);
+        return;
     }
+
+    // 直接渲染图形（同时也保留“文本转图”的独立流程）
+    try {
+        app.updateGraph();
+    } catch (e) {
+        app.showError("渲染图形时发生异常：" + e.message);
+        return;
+    }
+
+    var tt = NpnTruthTable(exprText, parsed);
+    app.renderTruthTable(tt);
+    app.showSuccess("解析成功：共 " + parsed.variables.length + " 个变量，已更新图形与真值表。");
 };
 
 app.updateGraph = function () {
@@ -806,58 +884,28 @@ app.updateGraph = function () {
 app.load=function() {
     try {
         origin = JSON.parse(document.getElementById("myModel").value);
-        status.textContent = "Diagram Model Loaded from JSON format.";
+        status.textContent = "已从 JSON 格式载入图模型。";
+        status.style.color = "#1b5e20";
     }
     catch (error) {
         origin = {
             nodeArray: [],
             linkArray: []
         };
-        status.textContent = "JSON format Error, Use Empty Format.";
+        status.textContent = "JSON 格式错误，已改用空图。";
+        status.style.color = "#c62828";
         document.getElementById("myModel").value = JSON.stringify(origin);
     }
     //ERUpdateOption();
     app.updateGraph();
-    app.UpdateOption();
 };
 
 app.save=function() {
     origin = app.ELDump(graph.toJSON().cells);
     document.getElementById("myModel").value = JSON.stringify(origin);
-    status.textContent = "Diagram Model Saved in JSON format.";
-
+    status.textContent = "图模型已保存为 JSON 格式。";
+    status.style.color = "#1b5e20";
 };
-
-function updateGraph() {
-    graph.resetCells(ELCreate(origin));
-    chosedElement.Sheets.clear();
-    chosedElement.Fields.clear();
-    chosedElement.Links.clear();
-    joint.layout.DirectedGraph.layout(graph, {
-        setLinkVertices: false,
-        marginX: 5,
-        marginY: 5
-    });
-    newScale = 1;
-    paper.fitToContent({
-        padding: 50,
-        allowNewOrigin: "any"
-    });
-    setContainerAndMini();
-    paperContainer.css({
-        left: Math.round((mainContainer.width() - paperContainer.width()) / 2),
-        top: Math.round((mainContainer.height() - paperContainer.height()) / 2),
-        position: "absolute"
-    });
-    miniView.css({
-        height: miniScale * mainContainer.height(), width: miniScale * mainContainer.width(),
-        left: -1 * miniScale * paperContainer.position().left,
-        top: -1 * miniScale * paperContainer.position().top
-    });
-
-};
-
-
 
 /*从本地载入文件，保存文件到本地 */
 if (window.FileList && window.File && window.FileReader) {
@@ -913,66 +961,89 @@ app.saveTextAsFile = function () {
     };
 } */
 
-sheet3Node = $("#sheet3");
-
-
-app.UpdateOption = function () {
-    var ImportNames = new Set([]);
-    origin.nodeArray.forEach(function (theNode) {
-        if (undefined != theNode.name && "" != theNode.name) {
-            ImportNames.add(theNode.name);
-        }
-    })
-    ImportNames = Array.from(ImportNames);
-    sheet3Node.select2({
-        placeholder: "输入要查找的元素名称:",
-        data: ["sheet2Name1", "sheet2Name2"].concat(ImportNames),
-        multiple: false,
-        width: "17em"
-    });
-
-}
-
 app.ChangeName = function () {
+    if (undefined == ERKeyNow) {
+        alert("请先在图形中点击选择一个节点。");
+        return false;
+    }
+    var sheets;
     try {
-        var sheets = JSON.parse(document.getElementById("ERName").value);
+        sheets = JSON.parse(document.getElementById("ERName").value);
     } catch (e) {
-        alert("Format Error");
+        alert("格式错误：元素名称需为 JSON 数组（点击节点后会自动填入）。");
         return false;
     }
     if (!(sheets instanceof Array)) {
-        alert("Format Error");
+        alert("格式错误：元素名称需为 JSON 数组。");
         return false;
-    };
+    }
     if (0 == sheets.length) {
-        alert("Format Error");
+        alert("格式错误：元素名称不能为空。");
         return false;
     }
-    var getArray = origin.nodeArray.filter(function (x) {
-        if ("Sheet" == x.type) {
-            for (z of sheets) {
-                if (0 != x.name.filter(function (y) { return z == y }).length) {
-                    return true;
-                }
-            }
-        }
+    var cell = graph.getCell(ERKeyNow);
+    if (!cell) {
+        alert("未找到所选节点，请重新选择。");
         return false;
+    }
+    var memoText = document.getElementById("ERMemo").value;
+    cell.attr({
+        label: { text: sheets.join("\n"), memo: memoText }
     });
-    if (getArray.length > 1) {
-        alert("Name Repeated in other Sheets");
-        return false;
-    } else {
-        var memoText = document.getElementById("ERMemo").value;
-        ERUnhighlight(ERKeyNow);
-        paper.findViewByModel(ERKeyNow).model.attr({
-            label: { text: sheets.join("\n"), memo: memoText }
-        });
-        app.save();
-    }
+    app.save();
+    status.textContent = "已保存节点名称与备注。";
+    status.style.color = "#1b5e20";
 }
 
+// 点击示例：填入表达式并立即解析
+app.setExample = function (expr) {
+    document.getElementById("ReversePol").value = expr;
+    app.parseLogic();
+};
 
+// 初始化可点击示例与操作符说明
+app.initHelp = function () {
+    var examples = [
+        "a b .",
+        "a b ,",
+        "a <",
+        "a b >",
+        "a b =",
+        "a a < ,",
+        "a a < .",
+        "a b . c >"
+    ];
+    var exBox = document.getElementById("examples");
+    if (exBox) {
+        for (var i = 0; i < examples.length; i++) {
+            (function (expr) {
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "example-btn";
+                btn.textContent = expr;
+                btn.addEventListener("click", function () { app.setExample(expr); });
+                exBox.appendChild(btn);
+            })(examples[i]);
+        }
+    }
+    var ops = [
+        { op: ".", name: "与 AND", sample: "a b ." },
+        { op: ",", name: "或 OR", sample: "a b ," },
+        { op: "<", name: "非 NOT", sample: "a <" },
+        { op: ">", name: "推出 IMPLY", sample: "a b >" },
+        { op: "=", name: "等价 XNOR", sample: "a b =" }
+    ];
+    var opsBox = document.getElementById("opsHelp");
+    if (opsBox) {
+        var html = "";
+        for (var j = 0; j < ops.length; j++) {
+            html += "<tr><td><code>" + ops[j].op + "</code></td><td>" + ops[j].name + "</td><td><code>" + ops[j].sample + "</code></td></tr>";
+        }
+        opsBox.innerHTML = html;
+    }
+};
 
+app.initHelp();
 app.load();
 
 
