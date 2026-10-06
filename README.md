@@ -2,6 +2,11 @@
 
 一个纯前端的**逆波兰逻辑表达式 → 逻辑电路图**生成器，并新增**真值表**、**中文错误提示**与**移动端适配**。
 
+## 项目地址
+
+- 改造后的项目仓库：<https://github.com/huangshiwen05-ship-it/logicsim-upgrade>
+- 线上网站（GitHub Pages）：<https://huangshiwen05-ship-it.github.io/logicsim-upgrade/>
+
 ## 原项目来源
 
 - 原项目仓库：<https://gitlab.com/kuangdash/logicsim.git>
@@ -113,9 +118,9 @@ npx http-server -p 8000
 - `public/style.css`：桌面 + 手机响应式样式。
 - `public/LogicParser.js`：原解析/建模/图形生成函数，新增独立求值器、校验器与真值表函数（`Npn*`）。
 - `public/ViewGen.js`：图形渲染与交互，新增解析流程、真值表渲染、示例与错误提示。
-- `test-logic.js` / `test-browser.js` / `test-layout.js`：本次改造的测试脚本。
+- `.github/workflows/deploy-pages.yml`：GitHub 官方 Pages Actions 工作流（`public` 作为站点根目录）。
+- `test-logic.js` / `test-browser.js` / `test-layout.js` / `test-file-io.js`：本次改造的测试脚本。
 
 ## 待办
 
-- 本阶段未推送远程仓库、未部署。
 - 未引入正式 LICENSE，发布前需与原作者确认。

@@ -6,7 +6,7 @@ const path = require('path');
 
 const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
 const PORT = 9223;
-const URL = 'http://127.0.0.1:8000/index.html';
+const URL = process.env.TEST_URL || 'http://127.0.0.1:8000/index.html';
 const USER_DATA = path.join(os.tmpdir(), 'edge-cdp-logicsim-' + Date.now());
 
 let ws;
@@ -85,7 +85,13 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
     await send('Runtime.enable');
     await send('Page.enable');
-    await sleep(1500); // 等页面初始化
+    // 等待页面就绪（已部署站点首次加载较慢，轮询直到 app 与关键元素可用）
+    for (let i = 0; i < 60; i++) {
+        const ready = await evaluate('typeof app !== "undefined" && !!document.getElementById("status") && document.querySelectorAll("#examples .example-btn").length >= 8');
+        if (ready) break;
+        await sleep(500);
+    }
+    await sleep(500);
 
     let pass = 0, fail = 0;
     function check(name, cond, detail) {
